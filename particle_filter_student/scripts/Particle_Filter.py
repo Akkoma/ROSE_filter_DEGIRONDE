@@ -7,7 +7,7 @@ import math
 
 class Particle_Filter:
 
-    NB_PARTICLES=200
+    NB_PARTICLES=500
     #FIXED_PLANE_Y = 100
     increment = 0
     DISTANCE_ERROR = 2
@@ -28,10 +28,10 @@ class Particle_Filter:
         self.width=width
         self.height=height
         self.obs_grid=obs_grid
-        self.particle_list=self.getRandParticle(self.NB_PARTICLES,0,width,0,height)
+        self.particle_list=self.getRandParticle(self.NB_PARTICLES, 0, width, 0, height)
 
     def resetParticle(self):
-        self.particle_list = self.getRandParticle(self.NB_PARTICLES, 0, self.width, 0, 720)
+        self.particle_list = self.getRandParticle(self.NB_PARTICLES, 0, self.width, 0, self.height)
 
         # ----------------------------------------------------------------------------------------------------------------
         # ----------------------------------------- COMPUTED RANDOM PARTICLES--------------------------------------------
@@ -50,8 +50,8 @@ class Particle_Filter:
         ##
         for i in range(nbr):
             x = random.randint(start_x, max_x)
-            y = random.randint(start_y,max_y)
-            particle_list.append(Particle(x,y,0,0))
+            y = random.randint(start_y, max_y)
+            particle_list.append(Particle(x,y,1,0))
         return particle_list
 
         # ----------------------------------------------------------------------------------------------------------------
@@ -69,84 +69,41 @@ class Particle_Filter:
         # ----------------------------------------------------------------------------------------------------------------
         # -------------------------------------- MOTION PREDICTION AND RESAMPLING   --------------------------------------
         # ----------------------------------------------------------------------------------------------------------------
+
     def motion_prediction(self):
         new_particle_list = []
-        choices = {particule.id():particule.w for particule in self.particle_list}
-        for _ in range(len(self.particle_list)):
+        num_particles = len(self.particle_list)
+        elite_frac = 0.1  # keep top 10% as elite
+        random_frac = 0.05  # inject 5% random particles
+        n_elite = max(1, int(num_particles * elite_frac))
+        n_random = max(1, int(num_particles * random_frac))
+        n_resample = num_particles - n_elite - n_random
+
+        # 1. Keep top 10% elite particles unchanged
+        top_particles = sorted(self.particle_list, key=lambda p: p.w, reverse=True)[:n_elite]
+        
+        for p in top_particles:
+            new_particle_list.append(Particle(p.x, p.y, 0, 0))
+
+        # 2. Resample the rest with Gaussian noise
+        choices = {particule.id(): particule.w for particule in self.particle_list}
+        for _ in range(n_resample):
             coord = self.weighted_random_choice(choices)
             x_coord = int(coord.split('_')[0])
             y_coord = int(coord.split('_')[1])
-
-            # Motion noise in both x and y
-            dx = random.randint(self.MOTION_PLANNER_MIN, self.MOTION_PLANNER_MAX)
-            dy = random.randint(-1, 1)  # small vertical movement
-
+            # Gaussian motion model (mean 0, std 2 for x, std 1 for y)
+            dx = int(random.gauss(2, 1))  # mean 2, std 2 (forward bias)
+            dy = int(random.gauss(0, 1))  # mean 0, std 2 (allow more y movement)
             new_x = max(0, min(self.width, x_coord + dx))
             new_y = max(0, min(self.height, y_coord + dy))
-
             new_particle_list.append(Particle(new_x, new_y, 0, 0))
-        #for _ in range(len(self.particle_list)):
-        #    coord = self.weighted_random_choice(choices)
-        #    x_coord = int(coord.split('_')[0])
-        #    y_coord = int(coord.split('_')[1])
-#
-        #    # Gaussian motion model (smoother noise)
-        #    dx = int(random.gauss(0, 2))  # mean 0, std 2
-        #    dy = int(random.gauss(0, 1))  # small lateral noise
-#
-        #    new_x = max(0, min(self.width, x_coord + dx))
- 
-        #    new_y = max(0, min(self.height, y_coord + dy))
-#
-        #    new_particle_list.append(Particle(new_x, new_y, 0, 0))
-        #Keep top 10% best particles unchanged
-        #top_particles = sorted(self.particle_list, key=lambda p: p.w, reverse=True)
-        #elite_count = max(1, len(self.particle_list) // 10)
-        #for p in top_particles[:elite_count]:
-        #    new_particle_list.append(Particle(p.x, p.y, 0, 0))
-#
-        ## Resample the rest
-        #for _ in range(len(self.particle_list) - elite_count):
-        #    coord = self.weighted_random_choice(choices)
-        #    x_coord = int(coord.split('_')[0])
-        #    y_coord = int(coord.split('_')[1])
-#
-        #    dx = random.randint(self.MOTION_PLANNER_MIN, self.MOTION_PLANNER_MAX)
-        #    dy = random.randint(self.MOTION_PLANNER_MIN, self.MOTION_PLANNER_MAX)
-        #    new_x = max(0, min(self.width, x_coord + dx))
-        #    new_y = max(0, min(self.width, y_coord + dy))
-#
-        #    new_particle_list.append(Particle(new_x, new_y, 0, 0))
-        #for i in range(len(self.particle_list)):
-        #    
 
-        #    ###################################
-        #    ##### TODO
-        #    ##   self.particle_list: list of available particles
-        #    ##
-        #    #####
-        #    ## Use the function self.weighted_random_choice(choices) returning
-        #    #  coordinate from a particle according a
-        #    ##  roulette wheel algorithm
-        #    #  Note that weighted_random_choice return a string containing coodinate x and y of the selected particle
-        #    #   coord = self.weighted_random_choice(choices)
-        #    #   x_coord = int(coord.split('_')[0])
-        #    #   y_coord = int(coord.split('_')[1])
+        # 3. Inject a few random particles for diversity
+        for _ in range(n_random):
+            x = random.randint(0, self.width)
+            y = random.randint(0, self.height)
+            new_particle_list.append(Particle(x, y, 0, 0))
 
-        #    coord = self.weighted_random_choice(choices)
-        #    x_coord = int(coord.split('_')[0])
-        #    y_coord = int(coord.split('_')[1])
-        #    #exploration noise
-        #    dx = random.randint(self.MOTION_PLANNER_MIN, self.MOTION_PLANNER_MAX)
-        #    # keep y mostly fixed (since plane is on fixed line),
-        #    # but you could add small noise if needed
-        #    dy = random.randint(self.MOTION_PLANNER_MIN, self.MOTION_PLANNER_MAX)  
-        #    new_x = max(0, min(self.width, x_coord + dx))
-        #    new_y = max(0, min(self.height, y_coord + dy))
-        #    # Create new particle with neutral weight, prob=0
-        #    #new_particle = Particle(new_x, new_y, 1.0, 0.0)
-        #    #new_particle_list.append(new_particle)
-        #    new_particle_list.append(Particle(new_x, new_y, 0, 0))
         return new_particle_list
 
         # -------------------------------------------------------
@@ -178,7 +135,7 @@ class Particle_Filter:
         sum_weights = 0
         for i in range(len(self.particle_list)):
             #Compute individual particle weight
-            current_weight = self.weightingParticle(self.particle_list[i].x, self.particle_list[i].y, observed_distance)
+            current_weight = self.weightingParticle(self.particle_list[i].x, self.particle_list[i].y + 50 , observed_distance)
             self.particle_list[i].w = current_weight
             sum_weights += current_weight
         for i in range(len(self.particle_list)):
@@ -192,59 +149,6 @@ class Particle_Filter:
     # -----------------------------------------------------
     #  ----------- EVALUATE PARTICLE (Weight)  -----------
     # -----------------------------------------------------
-
-
-    #def weightingParticle(self, p_x, p_y, observed_distance, 
-    #                    method="gaussian", obs_sigma=1.0, 
-    #                    outlier_prob=0.05, uniform_range=(0, 20)):
-    #    """
-    #    Compute the weight of a particle given its (p_x, p_y) position 
-    #    and an observed distance measurement.
-    #    
-    #    Parameters
-    #    ----------
-    #    p_x, p_y : float
-    #        Coordinates of the particle.
-    #    observed_distance : float
-    #        Sensor measurement (probe → ground).
-    #    method : str, optional
-    #        "gaussian" (default) for Normal likelihood
-    #        "robust" for Gaussian + uniform mixture model
-    #    obs_sigma : float, optional
-    #        Standard deviation of observation noise (for Gaussian likelihood).
-    #    outlier_prob : float, optional
-    #        Probability mass assigned to outliers in robust model.
-    #    uniform_range : tuple, optional
-    #        Range (min, max) for uniform component in robust model.
-    #    
-    #    Returns
-    #    -------
-    #    float
-    #        Non-normalized weight for the particle.
-    #    """
-    #    # predicted measurement from this particle
-    #    predicted_distance = distance_to_obstacle(p_x, p_y, self.obs_grid,self.width,self.height,self.SCALE_FACTOR)
-    #    
-    #    # Gaussian PDF
-    #    def normal_pdf(x, mu, sigma):
-    #        return (1.0 / (math.sqrt(2 * math.pi) * sigma)) * \
-    #            math.exp(-0.5 * ((x - mu) / sigma) ** 2)
-    #    
-    #    if method == "gaussian":
-    #        return normal_pdf(observed_distance, predicted_distance, obs_sigma)
-    #    
-    #    elif method == "robust":
-    #        # Gaussian component
-    #        gauss_val = normal_pdf(observed_distance, predicted_distance, obs_sigma)
-    #        # Uniform component
-    #        a, b = uniform_range
-    #        uniform_val = 1.0 / (b - a) if b > a else 1e-9
-    #        # Mixture likelihood
-    #        return (1 - outlier_prob) * gauss_val + outlier_prob * uniform_val
-    #    
-    #    else:
-    #        raise ValueError(f"Unknown weighting method: {method}")
-
 
     def weightingParticle(self,p_x, p_y, observed_distance):
         ###################################

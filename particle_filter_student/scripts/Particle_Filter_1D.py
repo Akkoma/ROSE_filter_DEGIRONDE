@@ -72,6 +72,9 @@ class Particle_Filter:
     def motion_prediction(self):
         new_particle_list = []
         choices = {particule.id():particule.w for particule in self.particle_list}
+
+        #Original resampling all particles
+
         #for _ in range(len(self.particle_list)):
         #    coord = self.weighted_random_choice(choices)
         #    x_coord = int(coord.split('_')[0])
@@ -83,9 +86,12 @@ class Particle_Filter:
 #
         #    new_x = max(0, min(self.width, x_coord + dx))
  
-        #    new_y = max(0, min(self.height, y_coord + dy))
+        #    new_y = 0
 #
         #    new_particle_list.append(Particle(new_x, new_y, 0, 0))
+
+        # Keep a few top particles unchanged
+
         #Keep top 10% best particles unchanged
         top_particles = sorted(self.particle_list, key=lambda p: p.w, reverse=True)
         elite_count = max(1, len(self.particle_list) // 10)
@@ -104,6 +110,9 @@ class Particle_Filter:
             new_y = 0
 
             new_particle_list.append(Particle(new_x, new_y, 0, 0))
+
+        # Alternative: Original resampling with motion model
+
         #for i in range(len(self.particle_list)):
         #    
 
@@ -167,7 +176,7 @@ class Particle_Filter:
         sum_weights = 0
         for i in range(len(self.particle_list)):
             #Compute individual particle weight
-            current_weight = self.weightingParticle(self.particle_list[i].x,  self.FIXED_PLANE_Y+50, observed_distance)
+            current_weight = self.weightingParticle(self.particle_list[i].x, self.particle_list[i].y + 50 , observed_distance)
             self.particle_list[i].w = current_weight
             sum_weights += current_weight
         for i in range(len(self.particle_list)):
@@ -181,58 +190,6 @@ class Particle_Filter:
     # -----------------------------------------------------
     #  ----------- EVALUATE PARTICLE (Weight)  -----------
     # -----------------------------------------------------
-
-
-    #def weightingParticle(self, p_x, p_y, observed_distance, 
-    #                    method="gaussian", obs_sigma=1.0, 
-    #                    outlier_prob=0.05, uniform_range=(0, 20)):
-    #    """
-    #    Compute the weight of a particle given its (p_x, p_y) position 
-    #    and an observed distance measurement.
-    #    
-    #    Parameters
-    #    ----------
-    #    p_x, p_y : float
-    #        Coordinates of the particle.
-    #    observed_distance : float
-    #        Sensor measurement (probe → ground).
-    #    method : str, optional
-    #        "gaussian" (default) for Normal likelihood
-    #        "robust" for Gaussian + uniform mixture model
-    #    obs_sigma : float, optional
-    #        Standard deviation of observation noise (for Gaussian likelihood).
-    #    outlier_prob : float, optional
-    #        Probability mass assigned to outliers in robust model.
-    #    uniform_range : tuple, optional
-    #        Range (min, max) for uniform component in robust model.
-    #    
-    #    Returns
-    #    -------
-    #    float
-    #        Non-normalized weight for the particle.
-    #    """
-    #    # predicted measurement from this particle
-    #    predicted_distance = distance_to_obstacle(p_x, p_y, self.obs_grid,self.width,self.height,self.SCALE_FACTOR)
-    #    
-    #    # Gaussian PDF
-    #    def normal_pdf(x, mu, sigma):
-    #        return (1.0 / (math.sqrt(2 * math.pi) * sigma)) * \
-    #            math.exp(-0.5 * ((x - mu) / sigma) ** 2)
-    #    
-    #    if method == "gaussian":
-    #        return normal_pdf(observed_distance, predicted_distance, obs_sigma)
-    #    
-    #    elif method == "robust":
-    #        # Gaussian component
-    #        gauss_val = normal_pdf(observed_distance, predicted_distance, obs_sigma)
-    #        # Uniform component
-    #        a, b = uniform_range
-    #        uniform_val = 1.0 / (b - a) if b > a else 1e-9
-    #        # Mixture likelihood
-    #        return (1 - outlier_prob) * gauss_val + outlier_prob * uniform_val
-    #    
-    #    else:
-    #        raise ValueError(f"Unknown weighting method: {method}")
 
 
     def weightingParticle(self,p_x, p_y, observed_distance):
